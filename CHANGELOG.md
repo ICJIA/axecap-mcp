@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 - `sanitizeSelector` now allows Latin Extended characters (`\u00C0-\u024F`) and forward slash — selectors like `.étiquette` and `a[href="/login"]` no longer get garbled
 - Added shebang (`#!/usr/bin/env node`) to `server.js` for consistency with lightcap
 
+### Changed
+
+- `publish.sh` now always bumps version (including first-time publish)
+
 ## [0.1.0] — 2026-04-10
 
 ### Added

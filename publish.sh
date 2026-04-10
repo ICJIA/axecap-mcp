@@ -81,17 +81,11 @@ fi
 # ─── Version bump ───────────────────────────────────────────────────
 
 CURRENT_VERSION=$(pkg_field version)
-
-if [[ "$FIRST_TIME" == true ]]; then
-  info "Current version: $CURRENT_VERSION (will publish as-is for first release)"
-  NEW_VERSION="$CURRENT_VERSION"
-else
-  info "Current version: $CURRENT_VERSION"
-  info "Bumping: $BUMP"
-  NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
-  NEW_VERSION="${NEW_VERSION#v}" # strip leading 'v'
-  info "New version: $NEW_VERSION"
-fi
+info "Current version: $CURRENT_VERSION"
+info "Bumping: $BUMP"
+NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
+NEW_VERSION="${NEW_VERSION#v}" # strip leading 'v'
+info "New version: $NEW_VERSION"
 
 # ─── Dry run ────────────────────────────────────────────────────────
 
@@ -108,9 +102,7 @@ echo ""
 
 if [[ "$DRY_RUN" == true ]]; then
   # Revert the version bump since we're not publishing
-  if [[ "$FIRST_TIME" == false ]]; then
-    git checkout package.json
-  fi
+  git checkout package.json
   info "Dry run complete. No changes made."
   exit 0
 fi
@@ -128,9 +120,7 @@ echo ""
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   # Revert the version bump
-  if [[ "$FIRST_TIME" == false ]]; then
-    git checkout package.json
-  fi
+  git checkout package.json
   info "Aborted. No changes made."
   exit 0
 fi
@@ -145,14 +135,9 @@ fi
 
 # ─── Git commit + tag ───────────────────────────────────────────────
 
-if [[ "$FIRST_TIME" == true ]]; then
-  # First-time: no version bump to commit, but tag the initial release
-  git tag "v$NEW_VERSION"
-else
-  git add package.json package-lock.json
-  git commit -m "release: v$NEW_VERSION"
-  git tag "v$NEW_VERSION"
-fi
+git add package.json package-lock.json
+git commit -m "release: v$NEW_VERSION"
+git tag "v$NEW_VERSION"
 
 git push && git push --tags
 
