@@ -114,8 +114,8 @@ describe('isBlockedIp', () => {
     assert.equal(await isBlockedIp('::1'), false);
   });
 
-  it('allows 0.0.0.0 (in LOCALHOST_HOSTS)', async () => {
-    assert.equal(await isBlockedIp('0.0.0.0'), false);
+  it('blocks 0.0.0.0 (unspecified address, not loopback)', async () => {
+    assert.equal(await isBlockedIp('0.0.0.0'), true);
   });
 });
 
@@ -192,6 +192,13 @@ describe('sanitizeError', () => {
 
   it('returns generic fallback for unknown errors', () => {
     assert.equal(sanitizeError(new Error('/Users/secret/path/to/file.js:42')), 'Audit failed');
+  });
+
+  it('maps a missing-browser error to an actionable, path-free message', () => {
+    const msg = "browserType.launch: Executable doesn't exist at /Users/x/Library/Caches/ms-playwright/chromium-1234/chrome-mac/Chromium.app/Contents/MacOS/Chromium\nLooks like Playwright was just installed or updated. Please run the following command to download new browsers:\nnpx playwright install";
+    const result = sanitizeError(new Error(msg));
+    assert.match(result, /playwright install/);
+    assert.ok(!result.includes('/Users/'));
   });
 
   it('never leaks filesystem paths', () => {

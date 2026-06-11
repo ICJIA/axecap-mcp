@@ -145,11 +145,6 @@ function truncateOutput(lines) {
   return result;
 }
 
-// Estimate tokens: ~4 chars per token for English text
-function estimateTokens(text) {
-  return Math.ceil(text.length / 4);
-}
-
 // ─── Main Compression ─────────────────────────────────────────────
 
 export function compressResults(results, options = {}) {
@@ -276,6 +271,7 @@ export function compressResults(results, options = {}) {
     lines.push(`\u2500\u2500 Needs Review (${incomplete.length} items) \u2500\u2500`);
 
     const cappedIncomplete = incomplete.slice(0, cap);
+    const skippedIncomplete = incomplete.length - cappedIncomplete.length;
     for (const item of cappedIncomplete) {
       const { criterion, level: wcagLevel } = getWcagInfo(item.tags || []);
       const wcagStr = criterion
@@ -296,6 +292,10 @@ export function compressResults(results, options = {}) {
       if (item.helpUrl) {
         lines.push(`    \u2139 ${sanitize(item.helpUrl)}`);
       }
+    }
+
+    if (skippedIncomplete > 0) {
+      lines.push(`  (+${skippedIncomplete} more)`);
     }
   }
 
@@ -357,6 +357,5 @@ export const _test = {
   extractSelector,
   extractElements,
   isDeltaViolation,
-  estimateTokens,
   truncateOutput,
 };

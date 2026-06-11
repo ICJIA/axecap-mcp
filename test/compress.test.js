@@ -13,7 +13,6 @@ const {
   extractSelector,
   extractElements,
   isDeltaViolation,
-  estimateTokens,
 } = _test;
 
 // ─── Mock axe-core result factories ──────────────────────────────
@@ -272,20 +271,6 @@ describe('isDeltaViolation', () => {
   });
 });
 
-// ─── estimateTokens ───────────────────────────────────────────────
-
-describe('estimateTokens', () => {
-  it('estimates ~1 token per 4 chars', () => {
-    assert.equal(estimateTokens('abcd'), 1);
-    assert.equal(estimateTokens('abcde'), 2);
-    assert.equal(estimateTokens('a'.repeat(100)), 25);
-  });
-
-  it('returns 0 for empty string', () => {
-    assert.equal(estimateTokens(''), 0);
-  });
-});
-
 // ─── compressResults ──────────────────────────────────────────────
 
 describe('compressResults', () => {
@@ -384,6 +369,19 @@ describe('compressResults', () => {
       includeIncomplete: true,
     });
     assert.ok(output.includes('Needs Review'));
+  });
+
+  it('marks truncated Needs Review items with a "+N more" note', () => {
+    const incomplete = Array.from({ length: 5 }, (_, i) =>
+      makeViolation(`incomplete-${i}`, { impact: 'moderate', nodes: ['span'] })
+    );
+    const output = compressResults(makeAxeResults({ violations: [], incomplete }), {
+      url: 'http://localhost:3000',
+      includeIncomplete: true,
+      maxViolations: 2,
+    });
+    // 5 incomplete, cap 2 → 3 hidden
+    assert.ok(output.includes('+3 more'), `expected "+3 more" in:\n${output}`);
   });
 
   it('deduplicates selectors with x count', () => {

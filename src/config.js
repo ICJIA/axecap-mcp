@@ -21,7 +21,8 @@ export const CONFIG = {
     '169.254.169.254',
     'metadata.google.internal',
     'metadata.azure.com',
-    '0.0.0.0',
+    '0.0.0.0',                  // IPv4 unspecified / all-interfaces
+    '[::]',                     // IPv6 unspecified / all-interfaces
   ],
   BLOCKED_IP_PREFIXES: [
     '169.254.',                // IPv4 link-local (AWS metadata)
@@ -33,11 +34,16 @@ export const CONFIG = {
     '192.168.',                // RFC1918 Class C private
     '127.',                    // Full loopback range (127.0.0.0/8)
     '0.',                      // 0.0.0.0/8 "this network"
-    'fd00:',                   // IPv6 unique-local
+    'fc00:',                   // IPv6 unique-local (lower half of fc00::/7)
+    'fd00:',                   // IPv6 unique-local (upper half of fc00::/7)
     'fe80:',                   // IPv6 link-local
     '::',                      // IPv6 unspecified / loopback
   ],
-  LOCALHOST_HOSTS: ['localhost', '127.0.0.1', '::1', '[::1]', '0.0.0.0', '[::]'],
+  // CGNAT shared address space (RFC6598): 100.64.0.0/10 — checked
+  // numerically in isPrivateAddress since a string prefix can't span it.
+  // Genuine loopback only. The unspecified addresses 0.0.0.0 / [::] are
+  // "all interfaces", not loopback — they live in BLOCKED_HOSTNAMES instead.
+  LOCALHOST_HOSTS: ['localhost', '127.0.0.1', '::1', '[::1]'],
   // WCAG conformance is cumulative: AAA includes AA includes A.
   // Includes wcag22a for WCAG 2.2 Level A additions.
   LEVEL_TAGS: {

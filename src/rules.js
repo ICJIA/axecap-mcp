@@ -12,9 +12,11 @@ export function getRules(options = {}) {
     rules = axe.getRules();
   }
 
-  // Filter by WCAG criterion (e.g., '1.4.3' → 'wcag143')
+  // Filter by WCAG criterion. Accept dotted ('1.4.3') or axe tag form
+  // ('wcag143') — strip any existing prefix/dots, then normalise to the tag.
   if (criterion) {
-    const criterionTag = 'wcag' + criterion.replace(/\./g, '');
+    const digits = criterion.toLowerCase().replace(/^wcag/, '').replace(/\./g, '');
+    const criterionTag = 'wcag' + digits;
     rules = rules.filter(r => r.tags.includes(criterionTag));
   }
 

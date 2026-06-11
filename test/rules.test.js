@@ -35,6 +35,13 @@ describe('getRules', () => {
     }
   });
 
+  it('accepts a criterion already in axe tag form (wcag143)', () => {
+    const dotted = getRules({ criterion: '1.4.3' }).map(r => r.ruleId).sort();
+    const tagged = getRules({ criterion: 'wcag143' }).map(r => r.ruleId).sort();
+    assert.ok(tagged.length > 0);
+    assert.deepEqual(tagged, dotted);
+  });
+
   it('searches by keyword', () => {
     const rules = getRules({ search: 'contrast' });
     assert.ok(rules.length > 0);

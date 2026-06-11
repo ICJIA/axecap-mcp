@@ -2,10 +2,11 @@
 
 import { program } from 'commander';
 import { readFileSync } from 'fs';
-import { execFile } from 'child_process';
 import { runAxeAudit } from './runner.js';
 import { compressResults, formatRuleList, formatRuleInfo } from './compress.js';
 import { getRules, getRuleInfo } from './rules.js';
+import { readPackageVersion, fetchLatestVersion } from './version.js';
+import { extractVerbosity, isServerInvocation } from './cli-args.js';
 import { CONFIG, setVerbosity } from './config.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
@@ -15,15 +16,8 @@ program
   .description('axe-core accessibility audit tool — compressed results optimized for Claude\'s context window')
   .version(pkg.version);
 
-// Global options
-program
-  .option('--verbose', 'Verbose logging')
-  .option('--quiet', 'Errors only');
-
-function applyGlobalOptions(opts) {
-  if (opts.verbose) setVerbosity('verbose');
-  if (opts.quiet) setVerbosity('quiet');
-}
+// --verbose / --quiet are handled before commander (see dispatch at the
+// bottom), so their position relative to a subcommand does not matter.
 
 function clampInt(val, min, max, fallback) {
   const n = parseInt(val);
@@ -43,7 +37,6 @@ program
   .option('-w, --wait-for <selector>', 'CSS selector to wait for before auditing')
   .option('-d, --directory <path>', 'Save full JSON results to directory')
   .action(async (url, opts) => {
-    applyGlobalOptions(program.opts());
     try {
       const rules = opts.rules ? opts.rules.split(',').map(s => s.trim()).filter(Boolean) : undefined;
       const maxViolations = clampInt(opts.maxViolations, 1, CONFIG.MAX_VIOLATIONS_CAP, CONFIG.MAX_VIOLATIONS_DEFAULT);
@@ -84,7 +77,6 @@ program
   .option('-c, --criterion <criterion>', 'Filter by WCAG criterion (e.g., 1.4.3)')
   .option('-s, --search <term>', 'Search rule IDs and descriptions')
   .action(async (opts) => {
-    applyGlobalOptions(program.opts());
     try {
       const rules = getRules({
         level: opts.level,
@@ -104,7 +96,6 @@ program
   .command('rule-info <ruleId>')
   .description('Get detailed info about a specific axe-core rule')
   .action(async (ruleId) => {
-    applyGlobalOptions(program.opts());
     try {
       const rule = getRuleInfo(ruleId);
       console.log(formatRuleInfo(rule));
@@ -118,32 +109,10 @@ program
   .command('status')
   .description('Show server version, axe-core version, and update availability')
   .action(async () => {
-    applyGlobalOptions(program.opts());
 
-    let axeVersion = 'unknown';
-    try {
-      const axePkg = JSON.parse(readFileSync(new URL('../node_modules/axe-core/package.json', import.meta.url)));
-      axeVersion = axePkg.version;
-    } catch { /* ignore */ }
-
-    let playwrightVersion = 'unknown';
-    try {
-      const pwPkg = JSON.parse(readFileSync(new URL('../node_modules/playwright/package.json', import.meta.url)));
-      playwrightVersion = pwPkg.version;
-    } catch { /* ignore */ }
-
-    let latestVersion = 'unknown';
-    try {
-      latestVersion = await new Promise((resolve, reject) => {
-        execFile('npm', ['view', 'axe-core', 'version'], { timeout: 5000 }, (err, stdout) => {
-          if (err) reject(err);
-          else {
-            const raw = stdout.trim();
-            resolve(/^\d+\.\d+\.\d+/.test(raw) ? raw : 'unknown');
-          }
-        });
-      });
-    } catch { /* ignore */ }
+    const axeVersion = readPackageVersion('axe-core');
+    const playwrightVersion = readPackageVersion('playwright');
+    const latestVersion = await fetchLatestVersion('axe-core');
 
     const updateNote = (latestVersion === 'unknown' || latestVersion === axeVersion)
       ? '(latest)'
@@ -157,13 +126,13 @@ program
     console.log(`  Platform:   ${process.platform} ${process.arch}`);
   });
 
-// Default: start MCP server (when no subcommand given)
-const subcommands = ['audit', 'rules', 'rule-info', 'status', 'help'];
-const arg2 = process.argv[2];
-const isSubcommand = arg2 && (subcommands.includes(arg2) || arg2 === '--help' || arg2 === '-h' || arg2 === '--version' || arg2 === '-V');
+// Handle global flags first (position-independent), then dispatch: a bare
+// invocation starts the MCP server, anything else goes to commander.
+const { verbosity, rest } = extractVerbosity(process.argv.slice(2));
+if (verbosity) setVerbosity(verbosity);
 
-if (!arg2 || (!isSubcommand && arg2.startsWith('-'))) {
+if (isServerInvocation(rest)) {
   await import('./server.js');
 } else {
-  program.parse();
+  program.parse(rest, { from: 'user' });
 }

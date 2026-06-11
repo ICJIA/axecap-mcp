@@ -87,6 +87,16 @@ NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
 NEW_VERSION="${NEW_VERSION#v}" # strip leading 'v'
 info "New version: $NEW_VERSION"
 
+# ─── CHANGELOG check ────────────────────────────────────────────────
+
+# Require a CHANGELOG entry for the new version before publishing.
+if ! grep -q "\[$NEW_VERSION\]" CHANGELOG.md; then
+  error "CHANGELOG.md has no entry for [$NEW_VERSION]. Add one before publishing."
+  git checkout package.json package-lock.json
+  exit 1
+fi
+info "CHANGELOG.md entry for $NEW_VERSION found."
+
 # ─── Dry run ────────────────────────────────────────────────────────
 
 info "Running dry run..."
@@ -102,7 +112,7 @@ echo ""
 
 if [[ "$DRY_RUN" == true ]]; then
   # Revert the version bump since we're not publishing
-  git checkout package.json
+  git checkout package.json package-lock.json
   info "Dry run complete. No changes made."
   exit 0
 fi
@@ -120,7 +130,7 @@ echo ""
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   # Revert the version bump
-  git checkout package.json
+  git checkout package.json package-lock.json
   info "Aborted. No changes made."
   exit 0
 fi

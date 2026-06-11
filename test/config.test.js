@@ -58,15 +58,16 @@ describe('CONFIG', () => {
     }
   });
 
-  it('has blocked hostnames including cloud metadata endpoints', () => {
+  it('has blocked hostnames including cloud metadata and unspecified addresses', () => {
     assert.ok(CONFIG.BLOCKED_HOSTNAMES.length > 0);
     assert.ok(CONFIG.BLOCKED_HOSTNAMES.includes('169.254.169.254'));
     assert.ok(CONFIG.BLOCKED_HOSTNAMES.includes('metadata.google.internal'));
     assert.ok(CONFIG.BLOCKED_HOSTNAMES.includes('metadata.azure.com'));
     assert.ok(CONFIG.BLOCKED_HOSTNAMES.includes('0.0.0.0'));
+    assert.ok(CONFIG.BLOCKED_HOSTNAMES.includes('[::]'));
   });
 
-  it('has blocked IP prefixes covering RFC1918 + loopback ranges', () => {
+  it('has blocked IP prefixes covering RFC1918 + loopback + ULA ranges', () => {
     const prefixes = CONFIG.BLOCKED_IP_PREFIXES;
     assert.ok(prefixes.includes('10.'));
     assert.ok(prefixes.includes('192.168.'));
@@ -75,16 +76,19 @@ describe('CONFIG', () => {
     assert.ok(prefixes.includes('127.'));
     assert.ok(prefixes.includes('0.'));
     assert.ok(prefixes.includes('fe80:'));
+    assert.ok(prefixes.includes('fc00:'));
     assert.ok(prefixes.includes('fd00:'));
     assert.ok(prefixes.includes('::'));
   });
 
-  it('has localhost hosts including 0.0.0.0 and [::]', () => {
+  it('treats only genuine loopback as localhost, not the unspecified address', () => {
     assert.ok(CONFIG.LOCALHOST_HOSTS.includes('localhost'));
     assert.ok(CONFIG.LOCALHOST_HOSTS.includes('127.0.0.1'));
     assert.ok(CONFIG.LOCALHOST_HOSTS.includes('::1'));
-    assert.ok(CONFIG.LOCALHOST_HOSTS.includes('0.0.0.0'));
-    assert.ok(CONFIG.LOCALHOST_HOSTS.includes('[::]'));
+    assert.ok(CONFIG.LOCALHOST_HOSTS.includes('[::1]'));
+    // 0.0.0.0 and [::] are "all interfaces" / unspecified — blocked, not allowed
+    assert.ok(!CONFIG.LOCALHOST_HOSTS.includes('0.0.0.0'));
+    assert.ok(!CONFIG.LOCALHOST_HOSTS.includes('[::]'));
   });
 
   it('IMPACT_ORDER has 4 entries in correct order', () => {

@@ -337,6 +337,8 @@ axe rule: color-contrast
 
 Returns server version, axe-core version, Playwright version, and update availability.
 
+> The "update available" check runs `npm view axe-core version`, a one-time network call at server startup (5s timeout, non-blocking). Offline or behind a firewall it simply reports `(latest)` — no audit functionality depends on it.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | *(none)* | — | — | No parameters |
@@ -584,13 +586,16 @@ AxeCap runs locally over stdio — no network listener, no ports, no remote atta
 ### SSRF prevention
 
 - **Scheme whitelist:** Only `http:` and `https:` URLs are allowed. `file://`, `data:`, `javascript:`, `ftp://`, and all other schemes are blocked.
-- **Metadata endpoint blocklist:** AWS (`169.254.169.254`), GCP (`metadata.google.internal`), Azure (`metadata.azure.com`), and `0.0.0.0` are blocked by hostname.
-- **Private IP range blocklist:** All RFC1918 private ranges (`10.x`, `172.16-31.x`, `192.168.x`), full loopback range (`127.x`), "this network" range (`0.x`), IPv4 link-local (`169.254.x`), IPv6 link-local (`fe80:`), IPv6 unique-local (`fd00:`), and IPv6 unspecified/loopback (`::`) are blocked.
-- **IPv6-mapped IPv4 normalization:** Addresses like `::ffff:169.254.169.254` are normalized before prefix checking.
-- **IP resolution:** Hostnames are resolved to IP addresses and checked against blocked ranges.
+- **Metadata / unspecified-address blocklist:** AWS (`169.254.169.254`), GCP (`metadata.google.internal`), Azure (`metadata.azure.com`), and the unspecified addresses `0.0.0.0` and `[::]` are blocked by hostname. Genuine loopback (`localhost`, `127.0.0.1`, `::1`) remains allowed so local dev servers can be audited; the "all interfaces" addresses are treated as blocked, not as loopback.
+- **Private IP range blocklist:** All RFC1918 ranges (`10.x`, `172.16–31.x`, `192.168.x`), full loopback (`127.x`), "this network" (`0.x`), CGNAT shared space (`100.64.0.0/10`, RFC6598), IPv4 link-local (`169.254.x`), IPv6 link-local (`fe80::/10`), IPv6 unique-local (full `fc00::/7` — both the `fc` and `fd` halves), and IPv6 unspecified/loopback (`::`, `::1`) are blocked.
+- **IPv6-mapped IPv4 normalization:** Addresses like `::ffff:169.254.169.254` are normalized before classification.
+- **Multi-address DNS check:** Hostnames are resolved with `{ all: true }` and blocked if **any** returned address is private — defends against hosts that publish a mix of public and internal records.
 - **Fail-closed DNS:** If hostname resolution fails, the request is blocked (not allowed).
 - **Post-navigation URL recheck:** After Playwright navigates, `page.url()` is validated against the same blocklist — catches HTTP redirect chains and DNS rebinding attacks.
-- **HTML audit network blocking:** `audit_html` blocks all network requests via `page.route('**/*', route => route.abort())`, preventing SSRF via embedded resources like `<img src="http://169.254.169.254/...">`.
+- **Sub-resource filtering (`audit_url`):** The loaded page's own requests (images, scripts, `fetch`) are intercepted; any request to a metadata endpoint or private IP literal is aborted, so an audited page cannot reach the cloud metadata service or probe the LAN. Public resources (CDNs) and loopback are allowed, matching the navigation policy.
+- **HTML audit network blocking:** `audit_html` blocks **all** network requests via `page.route('**/*', route => route.abort())`, preventing SSRF via embedded resources like `<img src="http://169.254.169.254/...">`.
+
+> **Known limitation:** DNS for hostnames is resolved once at validation time, not re-checked at connection time, and sub-resource hostnames are not re-resolved. A determined DNS-rebinding attacker controlling a domain could still target their *own* internal network; the metadata/private-IP-literal blocks above are the primary defense.
 
 ### Prompt injection prevention
 
@@ -620,7 +625,7 @@ The `waitFor` parameter is restricted to CSS selectors only. Playwright pseudo-s
 
 | Resource | Limit | Enforced By |
 |----------|-------|-------------|
-| Concurrent audits | 2 max | runner.js (queue + counter) |
+| Concurrent audits | 2 max | runner.js (slot gate, fail-fast beyond) |
 | Page load timeout | 30s | Playwright `goto` options |
 | axe-core execution timeout | 30s | `page.evaluate` timeout |
 | Total audit timeout | 60s | Promise.race in runner.js |

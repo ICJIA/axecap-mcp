@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'fs';
-import { execFile } from 'child_process';
 import { McpServer, StdioServerTransport } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import { runAxeAudit, runAxeOnHtml, sanitizeError } from './runner.js';
 import { compressResults, formatRuleList, formatRuleInfo } from './compress.js';
 import { getRules, getRuleInfo } from './rules.js';
+import { readPackageVersion, fetchLatestVersion } from './version.js';
 import { CONFIG, setVerbosity, log } from './config.js';
 
 if (process.argv.includes('--verbose')) setVerbosity('verbose');
@@ -16,27 +16,14 @@ if (process.argv.includes('--quiet')) setVerbosity('quiet');
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
 const serverVersion = pkg.version;
-
-let axeVersion = 'unknown';
-try {
-  const axePkg = JSON.parse(readFileSync(new URL('../node_modules/axe-core/package.json', import.meta.url)));
-  axeVersion = axePkg.version;
-} catch { /* ignore */ }
-
-let playwrightVersion = 'unknown';
-try {
-  const pwPkg = JSON.parse(readFileSync(new URL('../node_modules/playwright/package.json', import.meta.url)));
-  playwrightVersion = pwPkg.version;
-} catch { /* ignore */ }
+const axeVersion = readPackageVersion('axe-core');
+const playwrightVersion = readPackageVersion('playwright');
 
 // Non-blocking npm registry check at startup
 let _latestAxeVersion = null;
-const _latestAxePromise = new Promise((resolve) => {
-  execFile('npm', ['view', 'axe-core', 'version'], { timeout: 5000 }, (err, stdout) => {
-    const raw = err ? 'unknown' : stdout.trim();
-    _latestAxeVersion = /^\d+\.\d+\.\d+/.test(raw) ? raw : 'unknown';
-    resolve(_latestAxeVersion);
-  });
+const _latestAxePromise = fetchLatestVersion('axe-core').then((v) => {
+  _latestAxeVersion = v;
+  return v;
 });
 
 async function getLatestAxeVersion() {
