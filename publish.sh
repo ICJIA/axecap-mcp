@@ -3,14 +3,17 @@ set -euo pipefail
 
 # AxeCap publish script
 # Usage:
-#   ./publish.sh              — first-time setup + publish
-#   ./publish.sh patch        — bump patch version and publish (default)
-#   ./publish.sh minor        — bump minor version and publish
-#   ./publish.sh major        — bump major version and publish
-#   ./publish.sh --dry-run    — dry run only, no publish
+#   ./publish.sh                 — first-time setup + publish
+#   ./publish.sh patch           — bump patch version and publish (default)
+#   ./publish.sh minor           — bump minor version and publish
+#   ./publish.sh major           — bump major version and publish
+#   ./publish.sh patch 123456    — bump + publish, passing a 2FA OTP (skips the
+#                                  y/N confirm; needed for npm 2FA / non-interactive)
+#   ./publish.sh --dry-run       — dry run only, no publish
 
 PACKAGE_NAME="@icjia/axecap"
 BUMP="${1:-patch}"
+OTP="${2:-}"
 DRY_RUN=false
 
 if [[ "$BUMP" == "--dry-run" ]]; then
@@ -70,6 +73,11 @@ if [[ "$BUMP" != "patch" && "$BUMP" != "minor" && "$BUMP" != "major" ]]; then
   exit 1
 fi
 
+# Sanity-check OTP format if provided (npm 2FA codes are 6 digits)
+if [[ -n "$OTP" && ! "$OTP" =~ ^[0-9]{6}$ ]]; then
+  warn "OTP '$OTP' doesn't look like a 6-digit code — passing it through anyway."
+fi
+
 # ─── First-time detection ───────────────────────────────────────────
 
 FIRST_TIME=false
@@ -119,28 +127,36 @@ fi
 
 # ─── Confirm ────────────────────────────────────────────────────────
 
-echo ""
-if [[ "$FIRST_TIME" == true ]]; then
-  warn "About to publish $PACKAGE_NAME@$NEW_VERSION for the FIRST TIME."
+# An OTP is an explicit, time-sensitive signal of intent — skip the prompt so
+# the code doesn't expire while waiting (and so non-interactive runs work).
+if [[ -n "$OTP" ]]; then
+  info "OTP provided — skipping confirmation and publishing now."
 else
-  warn "About to publish $PACKAGE_NAME@$NEW_VERSION"
-fi
-read -p "Proceed? (y/N) " -n 1 -r
-echo ""
+  echo ""
+  if [[ "$FIRST_TIME" == true ]]; then
+    warn "About to publish $PACKAGE_NAME@$NEW_VERSION for the FIRST TIME."
+  else
+    warn "About to publish $PACKAGE_NAME@$NEW_VERSION"
+  fi
+  read -p "Proceed? (y/N) " -n 1 -r
+  echo ""
 
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  # Revert the version bump
-  git checkout package.json package-lock.json
-  info "Aborted. No changes made."
-  exit 0
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    # Revert the version bump
+    git checkout package.json package-lock.json
+    info "Aborted. No changes made."
+    exit 0
+  fi
 fi
 
 # ─── Publish ────────────────────────────────────────────────────────
 
+# ${OTP:+--otp "$OTP"} expands to nothing when no OTP was given, or to the
+# --otp flag and code when one was. If omitted and 2FA is on, npm prompts.
 if [[ "$FIRST_TIME" == true ]]; then
-  npm publish --access public
+  npm publish --access public ${OTP:+--otp "$OTP"}
 else
-  npm publish
+  npm publish ${OTP:+--otp "$OTP"}
 fi
 
 # ─── Git commit + tag ───────────────────────────────────────────────
