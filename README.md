@@ -571,7 +571,6 @@ src/
 | `playwright` | Browser automation (launches Chromium, navigates, runs `page.evaluate`) |
 | `commander` | CLI subcommand parsing |
 | `zod` | Schema validation for MCP tool parameters |
-| `@cfworker/json-schema` | Peer dependency of `@modelcontextprotocol/server` |
 
 **Not needed (unlike lightcap):**
 - No `lighthouse` — axe-core is the engine

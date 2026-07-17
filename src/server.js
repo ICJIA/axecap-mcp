@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'fs';
-import { McpServer, StdioServerTransport } from '@modelcontextprotocol/server';
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import { runAxeAudit, runAxeOnHtml, sanitizeError } from './runner.js';
 import { compressResults, formatRuleList, formatRuleInfo } from './compress.js';

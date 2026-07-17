@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] — 2026-07-17
+
+### Changed
+
+- **Upgraded `@modelcontextprotocol/server` from `2.0.0-alpha.2` to `2.0.0-beta.4`** (exact pin — the alpha line no longer receives fixes; npm `latest` now points at the beta line). The only code change required: `StdioServerTransport` is now imported from the `@modelcontextprotocol/server/stdio` subpath. Verified equivalent to alpha.2 via full MCP handshake, `tools/list` schema comparison, tool calls, invalid-input rejection, and an end-to-end browser audit.
+- **Removed the direct `@cfworker/json-schema` dependency** — it existed only to satisfy the alpha SDK's peer requirement, which beta.4 no longer declares (schema validation engines are now pluggable SDK subpaths; zod-based tool validation needs no configuration).
+
 ## [0.1.2] — 2026-06-11
 
 ### Security
