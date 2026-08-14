@@ -1,6 +1,6 @@
 {
   "name": "@icjia/axecap",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "MCP axe-core audit server for Claude Code — WCAG A/AA/AAA compliance audits with compressed results optimized for Claude's context window",
   "type": "module",
   "main": "src/server.js",
