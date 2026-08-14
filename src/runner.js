@@ -283,9 +283,16 @@ function buildAxeConfig(level, options) {
     if (!tags) {
       throw new Error(`Invalid WCAG level: ${level}`);
     }
+    // Optional add-on rule sets, mirroring the axe DevTools toggles. The
+    // Set dedupes (level 'best-practice' + bestPractices would double the
+    // tag). Experimental rules are excluded from tag runs by axe-core's
+    // default tagExclude; naming the tag in runOnly lifts that exclusion.
+    const values = new Set(tags);
+    if (options.bestPractices) values.add('best-practice');
+    if (options.experimental) values.add('experimental');
     config.runOnly = {
       type: 'tag',
-      values: tags,
+      values: [...values],
     };
   }
 

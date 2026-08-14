@@ -46,10 +46,12 @@ const server = new McpServer({
 server.registerTool(
   'audit_url',
   {
-    description: 'Run an axe-core accessibility audit on a web page at a specified WCAG conformance level. Default audits A + AA rules (cumulative). Returns violations grouped by impact with WCAG criteria, CSS selectors, and help URLs.',
+    description: 'Run an axe-core accessibility audit on a web page at a specified WCAG conformance level. Default audits A + AA rules (cumulative). Set bestPractices/experimental to layer those rule sets on top of the level (matches the axe DevTools extension toggles). Returns violations grouped by impact with WCAG criteria, CSS selectors, and help URLs.',
     inputSchema: z.object({
       url: z.url().max(CONFIG.MAX_URL_LENGTH).describe('HTTP or HTTPS URL to audit'),
       level: z.enum(['a', 'aa', 'aaa', 'best-practice']).optional().describe('WCAG conformance level — aa (default) audits A + AA rules; aaa audits A + AA + AAA'),
+      bestPractices: z.boolean().optional().describe('Also run best-practice rules on top of the WCAG level (axe DevTools "Best Practices" toggle)'),
+      experimental: z.boolean().optional().describe('Also run experimental rules on top of the WCAG level (axe DevTools "Experimental" toggle)'),
       delta: z.boolean().optional().describe('If true with level aaa, show only AAA-specific violations (the gap from AA to AAA)'),
       rules: z.array(z.string()).optional().describe('Run only these specific axe-core rule IDs (e.g., ["color-contrast", "image-alt"])'),
       maxViolations: z.number().int().min(1).max(15).optional().describe('Top N violations per impact group (default 10, max 15)'),
@@ -63,6 +65,8 @@ server.registerTool(
     try {
       const { results, jsonPath, meta } = await runAxeAudit(params.url, {
         level: params.level,
+        bestPractices: params.bestPractices,
+        experimental: params.experimental,
         delta: params.delta,
         rules: params.rules,
         maxViolations: params.maxViolations,
@@ -74,6 +78,8 @@ server.registerTool(
 
       let text = compressResults(results, {
         level: params.level || CONFIG.DEFAULT_LEVEL,
+        bestPractices: params.bestPractices,
+        experimental: params.experimental,
         delta: params.delta,
         maxViolations: params.maxViolations,
         includeIncomplete: params.includeIncomplete,
@@ -102,6 +108,8 @@ server.registerTool(
     inputSchema: z.object({
       html: z.string().max(CONFIG.MAX_HTML_LENGTH).describe('HTML content to audit'),
       level: z.enum(['a', 'aa', 'aaa', 'best-practice']).optional().describe('WCAG conformance level (default: aa)'),
+      bestPractices: z.boolean().optional().describe('Also run best-practice rules on top of the WCAG level'),
+      experimental: z.boolean().optional().describe('Also run experimental rules on top of the WCAG level'),
       rules: z.array(z.string()).optional().describe('Specific axe-core rule IDs to run'),
       maxViolations: z.number().int().min(1).max(15).optional().describe('Top N per impact group (default 10)'),
       viewport: z.enum(['desktop', 'mobile']).optional().describe('Viewport emulation (default: desktop)'),
@@ -112,6 +120,8 @@ server.registerTool(
     try {
       const { results, meta } = await runAxeOnHtml(params.html, {
         level: params.level,
+        bestPractices: params.bestPractices,
+        experimental: params.experimental,
         rules: params.rules,
         maxViolations: params.maxViolations,
         viewport: params.viewport,
@@ -120,6 +130,8 @@ server.registerTool(
 
       const text = compressResults(results, {
         level: params.level || CONFIG.DEFAULT_LEVEL,
+        bestPractices: params.bestPractices,
+        experimental: params.experimental,
         maxViolations: params.maxViolations,
         includeIncomplete: params.includeIncomplete,
         url: 'html-input',

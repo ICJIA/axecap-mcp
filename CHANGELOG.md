@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] — 2026-08-14
+
+### Added
+
+- **`bestPractices` and `experimental` options on `audit_url` and `audit_html`** —
+  layer axe's best-practice and experimental rule sets on top of any WCAG
+  level, matching the two axe DevTools extension toggles. Previously a
+  composed scan (e.g. "AA + best practices + experimental") was impossible:
+  `level: 'best-practice'` *replaces* the WCAG tags rather than adding to
+  them, and experimental rules only ran when named individually via `rules`.
+  Implementation note: axe-core excludes `experimental`-tagged rules from
+  tag-based runs via its default `tagExclude`; naming the tag in
+  `runOnly.values` lifts that exclusion — no per-rule enable map needed.
+  The result header marks the add-ons (e.g. `AA+BP+EXP`).
+
+### Changed
+
+- **axe-core `^4.10.0` → `^4.13.0`** (4.13.0 at time of publish), keeping the
+  engine aligned with current axe DevTools builds.
+
 ## [0.1.3] — 2026-07-17
 
 ### Changed

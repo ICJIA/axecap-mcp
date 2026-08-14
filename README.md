@@ -48,6 +48,7 @@ axecap solves all four. It's the precision tool for WCAG compliance work; lightc
 
 - Runs axe-core audits directly (not through Lighthouse) for full rule-set access
 - Targets WCAG conformance levels: A, AA (default), AAA, or best-practice
+- Layers best-practice and experimental rule sets on top of any level (`bestPractices` / `experimental` — the axe DevTools extension toggles)
 - AAA delta mode shows only the gap from AA to AAA ("what would it take?")
 - Audits specific axe-core rules by ID (e.g., `color-contrast`, `image-alt`)
 - Audits raw HTML content without a running server (component testing)
@@ -201,12 +202,14 @@ No HTTP ports, no environment variables, no API keys required.
 
 ### `audit_url`
 
-Run an axe-core accessibility audit on a web page at a specified WCAG conformance level. Default audits A + AA rules (cumulative).
+Run an axe-core accessibility audit on a web page at a specified WCAG conformance level. Default audits A + AA rules (cumulative). Set `bestPractices` / `experimental` to layer those rule sets on top of the level — together they reproduce the axe DevTools extension's two toggles (`level: 'aa', bestPractices: true, experimental: true` matches a "WCAG 2.1 AA + Best Practices + Experimental" extension scan).
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `url` | string | *(required)* | HTTP/HTTPS URL to audit |
 | `level` | string | `'aa'` | WCAG conformance level: `'a'`, `'aa'`, `'aaa'`, `'best-practice'` |
+| `bestPractices` | boolean | `false` | Also run best-practice rules on top of the level (axe DevTools "Best Practices" toggle) |
+| `experimental` | boolean | `false` | Also run experimental rules on top of the level (axe DevTools "Experimental" toggle) |
 | `delta` | boolean | `false` | If true with `level: 'aaa'`, show only AAA-specific violations |
 | `rules` | string[] | — | Run only these specific rule IDs (e.g., `['color-contrast', 'image-alt']`) |
 | `maxViolations` | number | 10 | Top N violations per impact group (max 15) |
@@ -285,6 +288,8 @@ Run an axe-core audit on raw HTML content. Useful for testing components or gene
 |-----------|------|---------|-------------|
 | `html` | string | *(required)* | HTML content to audit |
 | `level` | string | `'aa'` | WCAG conformance level |
+| `bestPractices` | boolean | `false` | Also run best-practice rules on top of the level |
+| `experimental` | boolean | `false` | Also run experimental rules on top of the level |
 | `rules` | string[] | — | Specific rule IDs to run |
 | `maxViolations` | number | 10 | Top N per impact group |
 | `viewport` | string | `'desktop'` | `'desktop'` or `'mobile'` |

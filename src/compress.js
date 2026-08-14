@@ -150,6 +150,8 @@ function truncateOutput(lines) {
 export function compressResults(results, options = {}) {
   const {
     level = CONFIG.DEFAULT_LEVEL,
+    bestPractices = false,
+    experimental = false,
     delta = false,
     maxViolations = CONFIG.MAX_VIOLATIONS_DEFAULT,
     includeIncomplete = false,
@@ -159,7 +161,9 @@ export function compressResults(results, options = {}) {
 
   const lines = [];
   const cleanUrl = sanitize(url);
-  const levelDisplay = level.toUpperCase();
+  const levelDisplay = level.toUpperCase()
+    + (bestPractices && level !== 'best-practice' ? '+BP' : '')
+    + (experimental ? '+EXP' : '');
 
   // Get violations
   let violations = results.violations || [];
