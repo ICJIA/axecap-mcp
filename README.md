@@ -1,6 +1,14 @@
+![axecap: axe-core audits compressed for Claude, as an MCP server or CLI](https://raw.githubusercontent.com/ICJIA/axecap-mcp/main/docs/og-image.png)
+
 # @icjia/axecap
 
-A lightweight local MCP server that runs axe-core accessibility audits via Playwright and returns compressed, actionable results optimized for Claude's context window. Where lightcap wraps Lighthouse (which embeds axe-core behind several layers of abstraction), axecap runs axe-core **directly** — giving full control over WCAG conformance level targeting (A, AA, AAA), rule selection, and element-level detail that Lighthouse filters or aggregates away.
+[![npm](https://img.shields.io/npm/v/@icjia/axecap?color=111&label=npm)](https://www.npmjs.com/package/@icjia/axecap)
+[![license: MIT](https://img.shields.io/badge/license-MIT-111)](LICENSE)
+![MCP server + CLI](https://img.shields.io/badge/runs%20as-MCP%20server%20%2B%20CLI-111)
+
+A lightweight local MCP server **and command-line tool** that runs axe-core accessibility audits via Playwright and returns compressed, actionable results optimized for Claude's context window. Where lightcap wraps Lighthouse (which embeds axe-core behind several layers of abstraction), axecap runs axe-core **directly** — giving full control over WCAG conformance level targeting (A, AA, AAA), rule selection, and element-level detail that Lighthouse filters or aggregates away.
+
+**New in 0.3: the `axecap` CLI.** It does everything the MCP server does, so Claude (or any coding agent) can run audits from the shell without the MCP server installed. That saves the tokens its tool definitions take up in every session. See [MCP or CLI?](#mcp-or-cli) and [How language models use the CLI](#how-language-models-use-the-cli).
 
 ## Why?
 
@@ -72,6 +80,12 @@ AxeCap runs two ways, and both produce **the same compressed text output** from 
 - **CLI**: Claude (or you) runs `axecap audit <url>` through the shell. No server registration, no tool definitions in context, nothing running between audits. This is the lighter option if you want to save tokens and credits, and it works the same on macOS and Linux.
 
 You can run both, or uninstall the MCP server and rely on the CLI alone (see [Using the CLI instead of the MCP server](#using-the-cli-instead-of-the-mcp-server)).
+
+### Why the CLI exists
+
+axecap started as an MCP server, and that's still a great way to run it. But an MCP server has a standing cost: every registered server's tool definitions (`audit_url`, `audit_html`, `get_rules`, `get_rule_info` and `get_status`, with their schemas and descriptions) are sent to the model in every session, whether or not you audit anything that day. A server process also starts with each session.
+
+The CLI removes that overhead. It is the same code producing the same compressed report. The difference is how the model reaches it: it runs a shell command when it needs an audit, and nothing is loaded the rest of the time. Every coding agent with a shell can use it too, not only MCP clients: Claude Code, Codex, Cursor's agent, Aider, or a CI script.
 
 ### Feature parity
 
@@ -452,6 +466,80 @@ Prefer npm? `npm install -g @icjia/axecap` installs the same `axecap` command (n
      `axecap rule-info <id>`, `axecap status`. Output is compressed plain text.
      Run `axecap <command> --help` for flags (--level, --best-practices, --experimental, --delta, ...).
    ```
+
+### How language models use the CLI
+
+Once `axecap` is on your `PATH` (or aliased), a model uses it exactly the way you would: it runs the command in its shell tool and reads the report from stdout. There is nothing to register. The model only needs to know the command exists, which is what the `CLAUDE.md` / `AGENTS.md` note above is for.
+
+A typical session, with the commands the model runs on its own:
+
+```bash
+axecap --quiet audit http://localhost:3000
+axecap --quiet audit http://localhost:3000 --level aaa --delta
+axecap --quiet audit-html src/components/Nav.html
+axecap rule-info color-contrast
+```
+
+What comes back is the same compact plain text the MCP tools return, small enough to read in full:
+
+```
+axe: http://localhost:3000/ [desktop] AA — 3 violations (1c 2s)
+
+── Critical (1 violations, 1 el) ──
+  ✗ image-alt [1.1.1 A] (1 el)
+    → img.hero
+    ℹ https://dequeuniversity.com/rules/axe/4.14/image-alt?application=axeAPI
+...
+```
+
+From there the model runs the usual loop: audit → read the violations → edit the code → re-run the same `axecap audit` command.
+
+Tips for agents:
+
+- **Use `--quiet`.** It keeps progress logs off stderr, so the model's context only holds the report.
+- **Exit codes:** `0` on success, `1` on any error, with a single readable `Error: ...` line.
+- **Other agents:** put the same note in whatever file your agent reads: `AGENTS.md` (Codex and others), `.cursor/rules`, `CONVENTIONS.md` (Aider), and so on.
+
+  ```markdown
+  - For WCAG audits, use the `axecap` CLI via Bash:
+    `axecap --quiet audit <url>` (--level a|aa|aaa, --best-practices, --experimental,
+    --delta, --rules a,b, -n <max>, --viewport mobile, --wait-for <sel>),
+    `axecap --quiet audit-html <file|->`, `axecap rules`, `axecap rule-info <id>`.
+    Output is compressed plain text. Run `axecap <command> --help` for all flags.
+  ```
+
+### Setting up the alias by hand (zsh and bash)
+
+`install-cli.sh` does this for you. To do it yourself, point an alias at `src/cli.js` in your clone. Replace `/path/to/axecap-mcp` with the real path.
+
+**zsh** (the default shell on macOS):
+
+```bash
+echo "alias axecap='node \"/path/to/axecap-mcp/src/cli.js\"'" >> ~/.zshrc
+source ~/.zshrc
+axecap --version
+```
+
+**bash** (the usual default on Linux):
+
+```bash
+echo "alias axecap='node \"/path/to/axecap-mcp/src/cli.js\"'" >> ~/.bashrc
+source ~/.bashrc
+axecap --version
+```
+
+On macOS, bash login shells read `~/.bash_profile` rather than `~/.bashrc`. If the alias doesn't appear in a new Terminal window, add `[ -f ~/.bashrc ] && . ~/.bashrc` to `~/.bash_profile`.
+
+**Aliases vs. agents.** Shells only expand aliases in *interactive* sessions. A coding agent's shell tool may run commands non-interactively and never see the alias. That's why `install-cli.sh` also puts a real executable on your `PATH`. To do that by hand:
+
+```bash
+mkdir -p ~/.local/bin
+ln -sf "/path/to/axecap-mcp/src/cli.js" ~/.local/bin/axecap
+chmod +x "/path/to/axecap-mcp/src/cli.js"
+command -v axecap    # should print ~/.local/bin/axecap
+```
+
+(`~/.local/bin` must be on your `PATH`. Add `export PATH="$HOME/.local/bin:$PATH"` to your `~/.zshrc` or `~/.bashrc` if it isn't.) `npm install -g @icjia/axecap` achieves the same thing without a clone.
 
 ### Commands
 
