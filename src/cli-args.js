@@ -17,8 +17,10 @@ export function extractVerbosity(args) {
 }
 
 // With the global flags removed, a bare invocation (no remaining args) starts
-// the MCP server; anything else — a subcommand, --help, --version, or an
-// unknown token — is handed to commander to dispatch or report.
-export function isServerInvocation(rest) {
-  return rest.length === 0;
+// the MCP server — unless stdin is an interactive terminal, which means a
+// person typed `axecap` (MCP clients always pipe stdin); commander then shows
+// help. Anything else — a subcommand, --help, --version, or an unknown
+// token — is handed to commander to dispatch or report.
+export function isServerInvocation(rest, stdinIsTTY = false) {
+  return rest.length === 0 && !stdinIsTTY;
 }

@@ -39,3 +39,18 @@ describe('isServerInvocation', () => {
     assert.equal(isServerInvocation(['--version']), false);
   });
 });
+
+describe('isServerInvocation with an interactive terminal', () => {
+  it('starts the server for a bare invocation with piped stdin (MCP clients)', () => {
+    assert.equal(isServerInvocation([], false), true);
+  });
+
+  it('does NOT start the server for a bare invocation at a TTY (shows help instead)', () => {
+    assert.equal(isServerInvocation([], true), false);
+  });
+
+  it('never starts the server when a subcommand is present, TTY or not', () => {
+    assert.equal(isServerInvocation(['audit-html', 'page.html'], true), false);
+    assert.equal(isServerInvocation(['audit-html', '-'], false), false);
+  });
+});
