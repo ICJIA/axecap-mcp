@@ -61,8 +61,47 @@ axecap solves all four. It's the precision tool for WCAG compliance work; lightc
 - Waits for SPA elements before auditing (`waitFor` parameter)
 - Optionally saves full JSON results to disk for manual review
 - Reports server, axe-core, and Playwright version info with npm update availability
-- Standalone CLI for use outside of MCP clients
+- Standalone CLI with full MCP parity (macOS + Linux), so Claude can audit without the MCP server installed
 - Runs as a local MCP server over stdio (no HTTP, no ports, no remote attack surface)
+
+## MCP or CLI?
+
+AxeCap runs two ways, and both produce **the same compressed text output** from the same code (`runner.js` + `compress.js`):
+
+- **MCP server**: Claude calls `audit_url`, `audit_html` and the other tools directly. Registering it means its tool definitions are part of every Claude Code session and a server process is spawned for each one.
+- **CLI**: Claude (or you) runs `axecap audit <url>` through the shell. No server registration, no tool definitions in context, nothing running between audits. This is the lighter option if you want to save tokens and credits, and it works the same on macOS and Linux.
+
+You can run both, or uninstall the MCP server and rely on the CLI alone (see [Using the CLI instead of the MCP server](#using-the-cli-instead-of-the-mcp-server)).
+
+### Feature parity
+
+Everything the MCP server does, the CLI does too, as of v0.3.0.
+
+| Capability | MCP tool / parameter | CLI command / flag |
+|---|---|---|
+| Audit a URL | `audit_url` | `axecap audit <url>` |
+| WCAG level | `level` | `-l, --level a\|aa\|aaa\|best-practice` |
+| Add best-practice rules | `bestPractices` | `--best-practices` |
+| Add experimental rules | `experimental` | `--experimental` |
+| AAA-only delta | `delta` | `--delta` |
+| Specific rules | `rules: [...]` | `-r, --rules a,b,c` |
+| Top N per impact group | `maxViolations` | `-n, --max-violations <n>` |
+| Mobile viewport | `viewport` | `-v, --viewport mobile` |
+| Needs-review results | `includeIncomplete` | `--include-incomplete` |
+| Wait for SPA selector | `waitFor` | `-w, --wait-for <selector>` |
+| Save full JSON | `directory` | `-d, --directory <path>` |
+| Audit raw HTML | `audit_html` (`html` string) | `axecap audit-html <file>`, or `-` for stdin |
+| List / filter rules | `get_rules` | `axecap rules [-l] [-c] [-s]` |
+| Rule detail | `get_rule_info` | `axecap rule-info <id>` |
+| Versions + update check | `get_status` | `axecap status` |
+| Logging | `--verbose` / `--quiet` server args | `--verbose` / `--quiet` (any position) |
+
+**Known differences** (none affect results):
+
+- `audit_html` takes HTML as a string argument; `audit-html` reads it from a file or stdin, so large markup never has to pass through the conversation.
+- The MCP server checks npm for a newer axe-core once at startup; `axecap status` checks when you run it.
+- The CLI writes progress logs (`[axecap] ...`) to stderr. Add `--quiet` to keep Claude's Bash output down to the report itself.
+- SSRF protection, URL validation, the output-directory boundary, timeouts and error sanitization are shared code, so the two modes enforce exactly the same limits.
 
 ## Installation
 
@@ -376,12 +415,47 @@ For "what would it take to go from AA to AAA?", pass `level: 'aaa'` and `delta: 
 
 ## CLI (standalone usage)
 
-AxeCap includes a standalone CLI for use outside of MCP clients:
+### Install the CLI from a clone (macOS + Linux)
 
 ```bash
-# Install globally (or use npx)
-npm install -g @icjia/axecap
+git clone https://github.com/ICJIA/axecap-mcp.git
+cd axecap-mcp
+./install-cli.sh
+source ~/.zshrc     # or ~/.bashrc, or open a new terminal
+```
 
+`install-cli.sh` is safe to re-run (after a `git pull`, for example). It:
+
+1. Runs `npm install` and downloads Playwright's Chromium.
+2. Adds an `axecap` alias to `~/.zshrc` (and to `~/.bashrc` if you have one or bash is your login shell). The alias sits between `# >>> axecap cli >>>` markers, so re-running replaces it instead of duplicating it.
+3. Symlinks `~/.local/bin/axecap` to `src/cli.js`. Aliases only load in interactive shells, so the symlink is what lets **Claude Code's Bash tool**, scripts and cron find `axecap`. If `~/.local/bin` isn't on your `PATH`, the script tells you what to add.
+4. Runs a test audit to prove the browser launches. On Linux, if Chromium is missing system libraries, it prints the `playwright install-deps` command to run.
+
+To remove the alias and symlink: `./install-cli.sh --uninstall`.
+
+Prefer npm? `npm install -g @icjia/axecap` installs the same `axecap` command (no alias needed).
+
+### Using the CLI instead of the MCP server
+
+1. Install the CLI (above) and check it: `axecap status`.
+2. Remove the MCP server registration:
+
+   ```bash
+   claude mcp remove axecap -s user     # or -s project / -s local, wherever you added it
+   ```
+
+3. Tell Claude about the CLI. Add this to `~/.claude/CLAUDE.md` (or a project `CLAUDE.md`):
+
+   ```markdown
+   - For WCAG audits, use the `axecap` CLI via Bash (the MCP server is not installed):
+     `axecap --quiet audit <url>`, `axecap --quiet audit-html <file|->`, `axecap rules`,
+     `axecap rule-info <id>`, `axecap status`. Output is compressed plain text.
+     Run `axecap <command> --help` for flags (--level, --best-practices, --experimental, --delta, ...).
+   ```
+
+### Commands
+
+```bash
 # WCAG AA audit (default)
 axecap audit http://localhost:3000
 
@@ -390,6 +464,9 @@ axecap audit http://localhost:3000 --level aaa
 
 # AAA delta (only AAA-specific violations)
 axecap audit http://localhost:3000 --level aaa --delta
+
+# AA plus best practices and experimental rules (the axe DevTools toggles)
+axecap audit http://localhost:3000 --best-practices --experimental
 
 # Specific rules only
 axecap audit http://localhost:3000 --rules color-contrast,image-alt
@@ -406,6 +483,10 @@ axecap audit http://localhost:3000 --wait-for "#app-loaded"
 # Save full JSON to directory
 axecap audit http://localhost:3000 --directory ~/reports
 
+# Audit a local HTML file, or HTML piped on stdin (network requests blocked)
+axecap audit-html dist/index.html
+echo '<img src="a.png">' | axecap audit-html -
+
 # List AA rules
 axecap rules --level aa
 
@@ -419,13 +500,16 @@ axecap rules --search contrast
 axecap rule-info color-contrast
 
 # Check versions
-axecap status
+axecap --version     # axecap v0.3.0 (axe-core v4.13.0)
+axecap status        # also Playwright/Node, and checks npm for a newer axe-core
 
-# Verbose logging
-axecap --verbose audit http://localhost:3000
+# Quiet output (no progress logs on stderr), handy when Claude runs it
+axecap --quiet audit http://localhost:3000
 ```
 
-When run without a subcommand, `axecap` starts in MCP server mode (stdio transport).
+The exit code is `1` on any error, so `axecap` also works in scripts and CI.
+
+Run with no arguments, `axecap` starts the MCP server. MCP clients always launch it that way, with stdin piped. If you type plain `axecap` at a terminal, it prints help instead of sitting there waiting for JSON-RPC. The help starts with the axecap and axe-core versions, then lists the commands, examples and global flags.
 
 ## Usage examples
 
@@ -554,7 +638,8 @@ src/
 ├── runner.js ........... Playwright launch + axe-core injection + URL/directory validation
 ├── compress.js ......... axe results → compressed plain text (the core of the server)
 ├── rules.js ............ axe-core rule registry queries (metadata, tags, filtering)
-├── cli.js .............. Commander-based standalone CLI
+├── cli.js .............. Commander-based standalone CLI (MCP parity)
+├── cli-args.js ......... Pure argv helpers (global flags, server-vs-CLI dispatch)
 └── config.js ........... Constants, WCAG level tags, logging helper
 ```
 
@@ -564,7 +649,8 @@ src/
 | `runner.js` | Playwright lifecycle, axe-core injection via `page.evaluate()`, URL validation (scheme whitelist, IP resolution, metadata blocklist), directory validation (symlink-aware), waitFor validation |
 | `compress.js` | `compressResults()` — impact grouping + WCAG refs + element dedup + help URLs; `formatRuleList()` / `formatRuleInfo()` — rule registry formatting |
 | `rules.js` | `getRules()` and `getRuleInfo()` — queries axe-core's built-in rule registry without launching a browser |
-| `cli.js` | `audit`, `rules`, `rule-info`, `status` subcommands; falls back to MCP server mode when no subcommand given |
+| `cli.js` | `audit`, `audit-html`, `rules`, `rule-info`, `status` subcommands; starts MCP server mode on a bare invocation with piped stdin, prints help at a TTY |
+| `install-cli.sh` | macOS/Linux installer: deps + Chromium, `~/.zshrc`/`~/.bashrc` alias, `~/.local/bin` symlink, smoke test |
 | `config.js` | `CONFIG` object with all limits/thresholds/WCAG tags, `log(level, msg)` helper, `setVerbosity()` |
 
 ### Dependencies

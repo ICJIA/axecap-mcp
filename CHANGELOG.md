@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] — 2026-11-17
+
+### Added
+
+- **CLI parity with the MCP server**, so Claude can run audits through Bash without the MCP server installed (fewer tokens, no server process):
+  - `axecap audit` gains `--best-practices` and `--experimental` (the `bestPractices` / `experimental` options added to the MCP tools in 0.2.0).
+  - New `axecap audit-html <file>` command (the CLI version of `audit_html`). Pass `-` to read HTML from stdin.
+- **`install-cli.sh`** (macOS + Linux): runs `npm install`, downloads Chromium, adds an `axecap` alias to `~/.zshrc` (and `~/.bashrc` when present or bash is the login shell) inside a marked block that re-runs replace, symlinks `~/.local/bin/axecap` so non-interactive shells (including Claude Code's Bash tool) find it, and runs a test audit. On Linux, if the browser can't launch, it prints the `playwright install-deps` command. `--uninstall` removes the alias and symlink.
+- README: new "MCP or CLI?" section with a feature-parity table, plus steps for switching from the MCP server to the CLI.
+
+### Changed
+
+- Running bare `axecap` at an interactive terminal now prints help (exit 0) instead of silently starting the MCP server and waiting for input. MCP clients always pipe stdin, so they still get the server. The help header shows the axecap and axe-core versions and ends with examples and the global `--quiet` / `--verbose` flags.
+- `axecap --version` / `-V` now prints both versions: `axecap v0.3.0 (axe-core v4.13.0)`.
+- CLI `audit` / `audit-html` errors go through the same `sanitizeError()` as the MCP tools. For example, a missing browser now reports `Browser not installed — run: npx playwright install chromium` instead of Playwright's multi-line banner.
+- `src/cli.js` is now marked executable in git, so the symlink runs directly.
+
 ## [0.2.0] — 2026-08-14
 
 ### Added
