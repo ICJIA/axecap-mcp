@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] — 2026-11-17
+
+### Changed
+
+- **axe-core `^4.13.0` → `^4.14.1`** (4.14.1 at time of publish), so a local clone (which uses the lockfile) matches fresh npm installs. Tool list and options are unchanged. Help URLs in results now point at the 4.14 Deque University docs.
+
 ## [0.3.0] — 2026-11-17
 
 ### Added
